@@ -115,13 +115,12 @@ This project provides a **Bluetooth Manager script** that:
 
 ```
 bluetooth-audio-manager/
-├── docs/
+├── docs/demo.gif
 ├── scripts/
 │   └── bt-manager.sh
 ├── setup/
 │   └── install.sh
 ├── README.md
-├── LICENSE
 └── .gitignore
 ```
 
