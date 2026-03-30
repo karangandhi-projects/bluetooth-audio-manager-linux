@@ -1,3 +1,5 @@
+> Fix Linux Bluetooth A2DP missing issue (PipeWire/BlueZ) + one-key toggle between A2DP and HFP
+
 # 🔵 Bluetooth Audio Manager (Linux)
 
 Fix missing A2DP profile issues on Linux Bluetooth (PipeWire) and toggle easily between high-quality audio and mic mode.
