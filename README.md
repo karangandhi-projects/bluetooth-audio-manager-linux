@@ -189,6 +189,12 @@ If A2DP is missing:
 
 ---
 
+## 🎬 Demo
+
+![Demo](docs/demo.gif)
+
+---
+
 ## 🔧 Useful Debug Commands
 
 ```bash
