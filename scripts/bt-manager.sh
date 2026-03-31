@@ -1,56 +1,98 @@
 #!/bin/bash
 
-DEVICE="98:47:44:D3:60:65"   # your earbuds MAC
+DEVICE="${BT_DEVICE_MAC:-}"
 
 notify() {
-    /usr/bin/notify-send "Bluetooth Manager" "$1"
+    /usr/bin/notify-send -r 9991 -t 1500 "Bluetooth Manager" "$1"
 }
 
-# Get Bluetooth card
-CARD=$(/usr/bin/pactl list cards short | /usr/bin/grep bluez_card | /usr/bin/awk '{print $2}' | /usr/bin/head -n1)
+get_card() {
+    /usr/bin/pactl list cards short | /usr/bin/grep bluez_card | /usr/bin/awk '{print $2}' | /usr/bin/head -n1
+}
 
-# Check if card exists
-if [ -z "$CARD" ]; then
-    notify "Device not connected → trying recovery..."
+has_a2dp() {
+    local card="$1"
+    /usr/bin/pactl list cards | /usr/bin/grep -A20 "$card" | /usr/bin/grep -q "a2dp-sink"
+}
 
+get_current_profile() {
+    local card="$1"
+    /usr/bin/pactl list cards | /usr/bin/grep -A20 "$card" | /usr/bin/grep "Active Profile" | /usr/bin/awk '{print $3}'
+}
+
+restart_and_reconnect() {
+    notify "Recovering Bluetooth..."
+
+    sudo /usr/bin/systemctl daemon-reload
     sudo /usr/bin/systemctl restart bluetooth
-    sleep 2
 
-    echo -e "connect $DEVICE\nexit" | bluetoothctl
-    sleep 2
+    for i in {1..10}; do
+        /usr/bin/bluetoothctl show >/dev/null 2>&1 && break
+        /usr/bin/sleep 1
+    done
 
-    CARD=$(/usr/bin/pactl list cards short | /usr/bin/grep bluez_card | /usr/bin/awk '{print $2}' | /usr/bin/head -n1)
+    /usr/bin/sleep 1
+
+    echo -e "power on\nconnect $DEVICE\nquit" | /usr/bin/bluetoothctl
+
+    for i in {1..10}; do
+        CARD="$(get_card)"
+        [ -n "$CARD" ] && break
+        /usr/bin/sleep 1
+    done
+}
+
+if [ -z "$DEVICE" ]; then
+    notify "No device MAC set. Please set BT_DEVICE_MAC."
+    exit 1
+fi
+
+CARD="$(get_card)"
+
+# Case 1: Device not connected
+if [ -z "$CARD" ]; then
+    notify "Device not connected, attempting recovery..."
+    restart_and_reconnect
+    CARD="$(get_card)"
 
     if [ -z "$CARD" ]; then
-        notify "Failed to reconnect ❌"
+        notify "Failed to reconnect device"
+        exit 1
+    fi
+
+    if ! has_a2dp "$CARD"; then
+        notify "A2DP still missing after reconnect"
         exit 1
     fi
 fi
 
-# Check if A2DP exists
-HAS_A2DP=$(/usr/bin/pactl list cards | /usr/bin/grep -A20 "$CARD" | /usr/bin/grep "a2dp-sink")
+# Case 2: A2DP missing
+if ! has_a2dp "$CARD"; then
+    notify "A2DP missing, fixing..."
+    restart_and_reconnect
+    CARD="$(get_card)"
 
-if [ -z "$HAS_A2DP" ]; then
-    notify "A2DP missing → fixing..."
+    if [ -z "$CARD" ]; then
+        notify "Reconnect failed after A2DP recovery"
+        exit 1
+    fi
 
-    sudo /usr/bin/systemctl restart bluetooth
-    sleep 2
-
-    echo -e "connect $DEVICE\nexit" | bluetoothctl
-    sleep 2
-
-    CARD=$(/usr/bin/pactl list cards short | /usr/bin/grep bluez_card | /usr/bin/awk '{print $2}' | /usr/bin/head -n1)
+    if ! has_a2dp "$CARD"; then
+        notify "A2DP still unavailable after recovery"
+        exit 1
+    fi
 fi
 
-# Get current profile
-CURRENT=$(/usr/bin/pactl list cards | /usr/bin/grep -A20 "$CARD" | /usr/bin/grep "Active Profile" | /usr/bin/awk '{print $3}')
+CURRENT="$(get_current_profile "$CARD")"
 
-# Toggle logic
+# Toggle profiles
 if [[ "$CURRENT" == a2dp-sink* ]]; then
     /usr/bin/pactl set-card-profile "$CARD" headset-head-unit
-    notify "🎤 Mic Mode (HFP)"
+    /usr/bin/sleep 1
+    notify "Mic Mode (HFP)"
 else
     /usr/bin/pactl set-card-profile "$CARD" a2dp-sink-sbc_xq || \
     /usr/bin/pactl set-card-profile "$CARD" a2dp-sink
-    notify "🎧 Music Mode (A2DP)"
+    /usr/bin/sleep 1
+    notify "Music Mode (A2DP)"
 fi
