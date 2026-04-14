@@ -87,7 +87,7 @@ This project provides a **Bluetooth Manager script** that:
 ## ⚙️ Installation
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/bluetooth-audio-manager-linux.git
+git clone https://github.com/karangandhi-ptojects/bluetooth-audio-manager-linux.git
 cd bluetooth-audio-manager-linux
 chmod +x setup/install.sh
 ./setup/install.sh
